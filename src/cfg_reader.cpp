@@ -25,6 +25,7 @@ CfgReader::CfgReader(std::ifstream& file) {
         std::shared_ptr<CfgBasicBlock> block;
         std::smatch m;
         std::map<std::string, std::string> tmpVar2realVar;
+        std::string retVar;
         std::map<std::string, std::list<std::shared_ptr<cfgEdgeRaw>>> edges;
         bool isInFunction = false;
         bool skipLine = false;
@@ -138,6 +139,15 @@ CfgReader::CfgReader(std::ifstream& file) {
                     edge->condition = "";
                     edges[function->getName()].emplace_back(edge);
                     passToNextBlock = false;
+                } else if (retVar.empty()
+                           && std::regex_search(line, m, std::regex("[a-zA-Z].+ (D.[0-9]+)"))) {
+                    retVar = m[1];
+                } else if (!retVar.empty()
+                           && std::regex_search(line, m, std::regex("return " + retVar))) {
+                    // nop
+                } else if (!retVar.empty()
+                           && std::regex_search(line, m, std::regex(retVar + " = (.*);"))) {
+                    block->appendLine("  return " + (std::string)m[1] + ";");
                 } else {
                     block->appendLine(line);
                 }
@@ -153,6 +163,7 @@ CfgReader::CfgReader(std::ifstream& file) {
                     block.reset(new CfgBasicBlock);
                     tmpVar2realVar.clear();
                     edges[m[1]] = std::list<std::shared_ptr<cfgEdgeRaw>>();
+                    retVar.clear();
                 }
             }
         }
